@@ -94,7 +94,7 @@ function recordRoute(call, cb) {
   let previous = null;
   // Start a timer
   let start_time = process.hrtime();
-  call.on("data", point => (point_count += 1));
+  call.on("data", point => console.log(point));
   call.on("end", () => {
     cb(null, {
       point_count: point_count,

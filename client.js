@@ -84,10 +84,6 @@ function runRecordRoute(cb) {
         cb(error);
         return;
       }
-      console.log("Finished trip with", stats.point_count, "points");
-      console.log("Passed", stats.feature_count, "features");
-      console.log("Travelled", stats.distance, "meters");
-      console.log("It took", stats.elapsed_time, "seconds");
       cb();
     });
 
