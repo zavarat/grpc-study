@@ -7,23 +7,6 @@ const path = require("path");
 const fs = require("fs");
 const _ = require("lodash");
 
-const { Writable } = require("stream");
-const { StringDecoder } = require("string_decoder");
-
-class StringWritable extends Writable {
-  constructor(options) {
-    super(options);
-    this._decoder = new StringDecoder(options && options.defaultEncoding);
-    this.data = "";
-  }
-  _write(chunk, encoding, callback) {
-    if (encoding === "buffer") {
-      chunk = this._decoder.write(chunk);
-    }
-    this.data += chunk;
-  }
-}
-
 const PROTO_PATH = path.join(__dirname, "proto", "route.proto"); //    path.resolve("proto", "route.proto")
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: false,
@@ -86,24 +69,38 @@ function runListFeatures() {
 }
 
 function runRecordRoute(cb) {
-  const euro = [[0xe2, 0x82], [0xac]].map(Buffer.from);
-  const w = new StringWritable({
-    decodeStrings: false,
-    defaultEncoding: "utf8"
+  const argv = parseArgs(process.argv, {
+    string: "db_path"
   });
 
-  client.recordRoute(w, (err, data) => {
+  fs.readFile(path.resolve(argv.db_path), (err, data) => {
     if (err) {
       cb(err);
       return;
     }
+    let feature_list = JSON.parse(data);
+    const call = client.recordRoute(function(error, stats) {
+      if (error) {
+        cb(error);
+        return;
+      }
+      console.log("Finished trip with", stats.point_count, "points");
+      console.log("Passed", stats.feature_count, "features");
+      console.log("Travelled", stats.distance, "meters");
+      console.log("It took", stats.elapsed_time, "seconds");
+      cb();
+    });
 
-    console.log(data);
+    for (let i = 0; i < 2; ++i) {
+      let rand_point = feature_list[_.random(0, feature_list.length - 1)];
+      call.write({
+        latitude: rand_point.location.latitude,
+        longitude: rand_point.location.longitude
+      });
+    }
+
+    call.end();
   });
-
-  w.write("currency: ");
-  w.write(euro[0]);
-  w.end(euro[1]);
 }
 
 async function main() {
