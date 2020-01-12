@@ -6,6 +6,9 @@ const protoLoader = require("@grpc/proto-loader");
 const path = require("path");
 const fs = require("fs");
 const _ = require("lodash");
+const stream = require("stream");
+const zlib = require("zlib");
+const crypto = require("crypto");
 
 const PROTO_PATH = path.join(__dirname, "proto", "route.proto"); //    path.resolve("proto", "route.proto")
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -21,6 +24,27 @@ const client = new routeguide.RouteGuide(
   grpc.credentials.createInsecure()
 );
 const COORD_FACTOR = 1e7;
+
+const TS = new stream.Transform({
+  objectMode: true,
+  transform(data, enc, cb) {
+    console.log(data.chk.toString());
+    cb(null, data.chk.toString());
+  }
+});
+
+const MyTransform = new stream.Transform({
+  readableObjectMode: true,
+  transform(chk, enc, cb) {
+    console.log(chk.toString());
+    cb(null, { chk: chk });
+    // if (chk.toString().includes("ERROR")) {
+    //   cb(new Error("민감정보 발견"));
+    // } else {
+    //   cb(null, { chk: chk });
+    // }
+  }
+});
 
 function runGetFeature(cb) {
   console.log("inside rungetfeature function");
@@ -99,22 +123,91 @@ function runRecordRoute(cb) {
   });
 }
 
-async function main() {
-  // runGetFeature(err => {
-  //   if (err) {
-  //     console.log("outer function has an error.");
-  //   } else {
-  //     console.log("outer function has succeeded.");
-  //   }
-  // });
-  // runListFeatures();
-  runRecordRoute(err => {
+function runDataStreaming() {
+  console.log("inside run-data-streaming()");
+  //const rr = fs.createReadStream("test.txt");
+
+  const strm = client.dataStreaming((err, ret) => {
     if (err) {
-      console.log("outer function has an error.");
+      console.log("client : file transfer failed.");
+      console.log(err);
     } else {
-      console.log("outer function has succeeded.");
+      console.log("client : file transfer succeeded.");
     }
   });
+
+  stream.pipeline(
+    fs.createReadStream("test.txt", {
+      encoding: "utf8"
+    }),
+    //zlib.createGzip(),
+    MyTransform,
+    strm,
+    err => {
+      if (err) {
+        console.log(err.message);
+      } else {
+        console.log("pipeline succeeded");
+      }
+    }
+  );
+}
+
+function runLogCllctr() {
+  console.log("inside runlogcollector");
+  const chokidar = require("chokidar");
+  const watcher = chokidar.watch(path.join(__dirname, "test.txt"));
+  watcher.on("change", path => {
+    const rr = fs.createReadStream(path);
+    const strm = client.logCllctr((err, res) => {
+      if (err) {
+        console.log("log collector failed.");
+      } else {
+        console.log("log collector succeeded.");
+      }
+    });
+
+    rr.on("readable", () => {
+      let chunk;
+      while ((chunk = rr.read()) !== null) {
+        strm.write({
+          f: {
+            chk: chunk
+          },
+          hostname: "jh-test"
+        });
+      }
+    });
+
+    rr.on("end", () => {
+      strm.end({
+        f: {
+          chk: null
+        },
+        hostname: "jh-test"
+      });
+    });
+  });
+}
+
+function runFileDownload() {
+  const strm = client.fileDownload();
+  stream.pipeline(strm, TS, fs.createWriteStream("duplexOUTPUT.txt"), err => {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log("success");
+    }
+  });
+  strm.on("end", () => {
+    console.log("file download complete");
+  });
+}
+
+function main() {
+  //runDataStreaming();
+  //runLogCllctr();
+  runFileDownload();
 }
 
 if (require.main === module) {

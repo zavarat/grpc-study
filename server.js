@@ -6,6 +6,9 @@ const protoLoader = require("@grpc/proto-loader");
 const path = require("path");
 const fs = require("fs");
 const _ = require("lodash");
+const stream = require("stream");
+const zlib = require("zlib");
+const crypto = require("crypto");
 
 const PROTO_PATH = path.join(__dirname, "proto", "route.proto"); //    path.resolve("proto", "route.proto")
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -18,6 +21,27 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 const routeguide = grpc.loadPackageDefinition(packageDefinition).routeguide;
 const COORD_FACTOR = 1e7;
 let feature_list = new Array();
+
+const TS = new stream.Transform({
+  objectMode: true,
+  transform(data, enc, cb) {
+    console.log(data.chk.toString());
+    cb(null, data.chk);
+  }
+});
+
+const MyTransform = new stream.Transform({
+  readableObjectMode: true,
+  transform(chk, enc, cb) {
+    console.log(chk.toString());
+    cb(null, { chk: chk });
+    // if (chk.toString().includes("ERROR")) {
+    //   cb(new Error("민감정보 발견"));
+    // } else {
+    //   cb(null, { chk: chk });
+    // }
+  }
+});
 
 function checkFeature(point) {
   let feature;
@@ -105,12 +129,66 @@ function recordRoute(call, cb) {
   });
 }
 
+//    서버가 받는 strm은 readable stream이다.
+//    strm을 writable stream와 pipe로 연결해야한다.
+//    writable stream은 duplex 스트림으로 구현하자.
+function dataStreaming(strm, cb) {
+  console.log("server : streaming function");
+  // strm
+  //   .pipe(TS)
+  //   //.pipe(zlib.createGunzip())
+  //   .pipe(fs.createWriteStream("output.txt"))
+  //   .on("error", err => console.log(`step3 ${err}`))
+  //   .on("finish", () => cb(null, "streaming done"));
+  stream.pipeline(
+    strm,
+    TS,
+    fs.createWriteStream("output.txt", { autoClose: true, emitClose: true }),
+    err => {
+      if (err) {
+        console.log(`server side error : ${err}`);
+        cb(err);
+      } else {
+        console.log("server side no error");
+        cb(null, "server side finish");
+      }
+    }
+  );
+}
+
+function logCllctr(strm, cb) {
+  let writer = null;
+
+  strm.on("data", data => {
+    if (!writer) {
+      writer = fs.createWriteStream(
+        path.join(__dirname, "LOG", data.hostname + ".txt")
+      );
+    }
+    writer.write(data.f.chk.toString());
+  });
+  strm.on("end", () => cb(null, { msg: "server log collector succeeded." }));
+}
+
+function fileDownload(dup) {
+  stream.pipeline(fs.createReadStream("test.txt"), MyTransform, dup, err => {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log("success");
+    }
+  });
+}
+
 function getServer() {
   const server = new grpc.Server();
   server.addService(routeguide.RouteGuide.service, {
     GetFeature: getFeature,
     ListFeatures: listFeatures,
-    RecordRoute: recordRoute
+    RecordRoute: recordRoute,
+    DataStreaming: dataStreaming,
+    LogCllctr: logCllctr,
+    FileDownload: fileDownload
   });
   return server;
 }

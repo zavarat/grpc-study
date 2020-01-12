@@ -1,2 +1,5 @@
 node_modules/
 .vscode/
+test.js
+LOG/
+.DS_Store

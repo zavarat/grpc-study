@@ -5,6 +5,17 @@ service RouteGuide{
   rpc GetFeature(Point) returns (Feature) {}
   rpc ListFeatures(Rectangle) returns (stream Feature) {}
   rpc RecordRoute(stream Point) returns (RouteSummary) {}
+  rpc DataStreaming(stream File) returns (Stats) {}
+  rpc LogCllctr(stream Log) returns (Stats) {}
+  rpc FileDownload(stream File) returns (stream File) {}
+}
+
+message Stats{
+  string msg=1;
+}
+
+message File{
+  required bytes chk=1;
 }
 
 message Point{
@@ -27,4 +38,9 @@ message RouteSummary{
   int32 feature_count=2;
   int32 distance=3;
   int32 elapsed_time=4;
+}
+
+message Log{
+  File f=1;
+  string hostname=2;
 }
