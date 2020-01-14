@@ -15,7 +15,7 @@ message Stats{
 }
 
 message File{
-  required bytes chk=1;
+  bytes chk=1;
 }
 
 message Point{
