@@ -1,0 +1,40 @@
+syntax="proto3";
+package study;
+
+service MyService{
+  rpc GetToken(User) returns (Token) {}
+  rpc LogCllctr(stream Log) returns (Stat) {}
+  rpc PipelineMonitoring(stream File) returns (Stat) {}
+  rpc FileDownload(FileName) returns (stream File) {}
+  rpc Chat(stream Msg) returns (stream Msg) {}
+}
+
+message FileName{
+  string name=1;
+}
+
+message User{
+  int32 id=1;
+}
+
+message Token{
+  string tkn=1;
+}
+
+message File{
+  bytes chk=1;
+}
+
+message Log{
+  File f=1;
+  string hostname=2;
+}
+
+message Stat{
+  string str=1;
+}
+
+message Msg{
+  string who=1;
+  string msg=2;
+}
