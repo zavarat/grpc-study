@@ -1,18 +1,30 @@
 version: 2.1
-jobs:
-  build:
-    docker:
-      - image: alpine:3.7
+
+commands:
+  param-test:
+    parameters:
+      flag:
+        default: true
+        type: boolean
     steps:
-      - checkout
       - run:
-          name: The first step
-          command: |
-            echo 'Hello World'!
-            echo 'This is delivery pipeline'
-      - run:
-          name: code has arrived
-          command: |
-            ls -al
-            echo 'end!!'
-      
+          name: bash ls command with option "-al"
+          command: ls <<# parameters.flag >> -al <</ parameters.flag >>
+
+executors:
+  my-executor:
+    docker:
+      - image: circleci/node:latest
+
+jobs:
+  boolean-param-test:
+    executor:
+      name: my-executor
+    steps:
+      - param-test:
+          flag: false
+
+workflows:
+  boolean-param-test:
+    jobs:
+      - boolean-param-test
