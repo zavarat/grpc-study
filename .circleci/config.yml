@@ -24,7 +24,7 @@ jobs:
       - run: pwd
       - checkout
       - param-test:
-          flag: false
+          flag: true
 
 workflows:
   boolean-param-test:
