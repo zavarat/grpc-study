@@ -21,6 +21,8 @@ jobs:
     executor:
       name: my-executor
     steps:
+      - run: pwd
+      - checkout
       - param-test:
           flag: false
 
